@@ -8,7 +8,7 @@ The most headache-inducing aspect of development is setting up the environment. 
 
 *Prerequisites*
 
-Your operating system is Windows x64, and xx [wsl2](https://learn.microsoft.com/zh-cn/windows/wsl/install) 和 [docker desktop](https://www.docker.com/products/docker-desktop/) are installed.
+Your operating system is Windows x64, and [wsl2](https://learn.microsoft.com/zh-cn/windows/wsl/install) 和 [docker desktop](https://www.docker.com/products/docker-desktop/) are installed.
 
 *Usage Instructions*
 
