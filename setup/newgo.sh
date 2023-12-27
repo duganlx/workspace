@@ -130,7 +130,7 @@ EOT
 # Configuration Inside the Container
 docker exec -it $container_name /bin/bash -c "chmod 750 /download/$inrunsh"
 docker exec -it $container_name /bin/bash -c "bash /download/$inrunsh"
-docker exec -it $container_name /bin/bash -c 'apt-get update && apt-get install -y gcc automake autoconf libtool make'
+docker exec -it $container_name /bin/bash -c 'apt-get update && apt-get install -y gcc automake autoconf libtool make pkg-config libzmq5 libczmq-dev g++'
 
 
 echo -e "Container '$container_name' created successfully. Enter the container with the following command: docker exec -it $container_name /bin/bash"

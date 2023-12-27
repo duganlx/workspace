@@ -205,15 +205,20 @@ step2: 调用查询接口可以查到上述插入的记录 POST /api/uc/v1/gsfsr
 由于 nacos 上会按照命名空间 namespaceId 和 groupId 进行保存每一个服务可以访问的 appsecret 的列表。比如 服务 EAM001:v1.0.1:192.168.15.42:prod 的列表 命名为 EAM001:v1.0.1:192.168.15.42:prod.yaml，内容类似于如下。
 
 ```yaml
-namespaceId: xxx
-groupId: xxx
-server: EAM001:v1.0.1:192.168.15.42:prod
-accessSecret:
-  - 521e3f3cc37c59b53a7553650f2e71973b148c56
-  - 2f4f3746a846216bdac6cbb1126a2ac043a27925
+server: bards:1.2.0:192.168.15.33:dev
+secrets:
+  - OzmeWJipI5TR2R41rWEdZjx6ejDAedWv3xu13UrtkIox4OJiss= 1547818295636267008@tttst rw
+  - N5RGxFgCnTK4ZA7QAErUFQ0hvjeyDps76XbmpDrp5w6KPrMz69= 1547818295636267008@apktsss rw
 ```
 
 其中 `accessSecret` 是能够访问该服务的 secret 列表。能够导致列表变化的情况有两种，一是管理员调整*用户-用户组-资源组-资源*之间的关联关系，二是用户增删访问令牌时。往 nacos 推送 secret 列表数据发生在 uc 项目刚启动时 和 列表数据发送变化时 两种情况。
+
+---
+
+Data Id: authorized_keys.yml
+Group: bards:1.2.0:192.168.15.33:dev
+
+--
 
 资源
 
@@ -546,3 +551,5 @@ _微服务架构下服务的权限管理_
 - [学习分布式不得不会的 ACP 理论](https://mp.weixin.qq.com/s?__biz=MzI3NzE0NjcwMg==&mid=2650121696&idx=1&sn=d8043efa332f3f76b96f7067754f2f01&chksm=f36bb8c1c41c31d7ca5f6bd02246bdb68ea49dd178c0b007fc0ff2f11d1a625113b5cccdc908&mpshare=1&scene=1&srcid=10046deszd2jz8vupmr0vSk6#rd)
 - [Nacos 详细教程](https://blog.csdn.net/Top_L398/article/details/111352983)
 - [go-kratos nacos 服务注册 demo](https://github.com/go-kratos/kratos/tree/main/contrib/registry/nacos)
+
+### 5. docker 说明
