@@ -2,7 +2,9 @@
 
 在*权限设计一期*中，利用 casbin 已经完成用户对服务的访问控制，以及用户令牌对服务的访问控制。因为该权限仅仅到服务这一层级，而服务下存在多个模块（如配置文件模块），需要对这些模块进行更细粒度的访问。并且，目前对于某个服务只能设置是否访问，也需要进一步细化是什么访问类型（如可读`r`、可写`w`、读写`*`等）。
 
-目前的设计实体中有用户 USER、用户组 USERGROUP、资源组 SRCGROUP、资源 SRC，其中资源 SRC 对应是业务中的服务。因为最新的需求中服务下需要细分模块，所以多加一个命名维度来表示模块。所以目前的策略规则命名规则为`sub, obj, mod, act`，所有情况如下。
+目前的设计实体中有用户 USER、用户组 USERGROUP、资源组 SRCGROUP、资源 SRC，其中资源 SRC 对应是业务中的服务。这四个实体之间的关联关系为 `用户->用户组->资源组->资源`。
+
+因为最新的需求中服务下需要细分模块，所以多加一个命名维度来表示模块。所以目前的策略规则命名规则为`sub, obj, mod, act`，所有情况如下。
 
 - 用户 lvx（uid: 10068）可访问所有资源：`p, USER:10068, *, *, *`
 - 用户 lvx（uid: 10068）可访问资源 srv1：`p, USER:10068, srv1, *, *`
@@ -41,6 +43,61 @@
 - 前三种情况的组合关系。
 
 由于管理员 admin 配置`mod: accessToken`的策略时会影响到用户 user 配置了含有`*`的资源访问的访问令牌的访问资源范围。不过这不影响访问令牌那张表。访问令牌真正能够访问哪些服务，是由 casbin 服务进行维护，其记录格式为`{p, appsecret, obj, mod, act}`（p 表示策略类型，appsecret 是令牌），所以当管理员删除某个用户访问某个资源的权限时，只需要将该 casbin 服务的表更新即可（`delete where appsecret=<userid's secret> and obj=? and act=?`）；当用户删除访问令牌，只需要再多做一步删除访问令牌表中对应记录。
+
+总结起来，主要涉及的接口及流程如下。涉及三张表 1. authcode 存放访问令牌的配置信息 2. casbin_authcode 存放访问令牌的权限访问信息 3. casbin_rbac 存放用户的权限访问信息。另外，下面描述中 `ANY` 表示任意取值。
+
+- 【用户】创建访问令牌
+
+  1. 参数合法性校验：基本字段 appid, expires, remark, name; 授权对象列表（对象字段 obj, mod=accessToken, act）
+  2. 策略`(obj,act)`合法性校验：
+     - `(a1,a2)`：去 casbin_rbac 中查询该用户 u 有无记录 `{sub:u, obj:a1, mod:accessToken, act:a2}`
+     - `(a1,*)`：去 casbin_rbac 中查询该用户 u 有无记录 `{sub:u, obj:a1, mod:accessToken, act:ANY}`
+     - `(*,a2)`：去 casbin_rbac 中查询该用户 u 有无记录 `{sub:u, obj:ANY, mod:accessToken, act:a2}`
+     - `(*,*)`：去 casbin_rbac 中查询该用户 u 有无记录 `{sub:u, obj:ANY, mod:accessToken, act:ANY}`
+  3. 在 authcode 中保存该访问令牌的相关信息 appid, expires, remark, name, 授权对象列表
+  4. 在 casbin_authcode 添加该新生成的访问令牌 secret 可访问的资源（步骤 2 中所命中的策略）的策略 `secret -> {obj, mod, act}[]`。casbin_authcode 表中的 mod 字段暂时不启用（所有都是 `*`）
+     - `(a1,a2)`：需要添加一条特定的记录 `{sub:secret, obj:a1, mod:*, act:a2}`
+     - `(a1,*)`：需要添加一批特定的记录 `{sub:secret, obj:a1, mod:*, act:ANY}`
+     - `(*,a2)`：需要添加一批特定的记录 `{sub:secret, obj:*, mod:*, act:a2}`
+     - `(*，*)`：需要添加一批特定的记录 `{sub:secret, obj:*, mod:*, act:*}`
+  5. 更新 nacos 上对应服务的 authorized_keys.yml：根据 obj 进行全量刷新：在 casbin_authcode 表通过 obj 过滤出目标 secret 及访问方式写入 nacos
+  6. 事务处理：当任何一步发生错误时都需要进行回滚，当进行 sql 操作时，形成对应的相反操作。保存成 Map，key 为表，value 是具体的 sql 操作参数
+
+- 【用户】删除访问令牌：令牌删除是用唯一键 id 进行
+
+  1. 存在性校验：是否存在该 id
+  2. 删除 casbin_authcode 中所有该访问令牌的策略 `{sub:secret, obj:ANY, mod:*, act:ANY}`
+  3. 将步骤 2 中所有涉及的 obj 都需要进行 nacos 全量更新
+  4. 事务处理：需要考虑在 nacos 多个文件写入的期间发生异常时的事务回滚问题，大概率网络问题
+
+- 【管理员】创建访问策略
+
+  1. 参数合法性校验：tpe（只能是 p 和 g）, sub, obj, mod, act。不允许为空。
+  2. 如果存在包含和被包含的情况需要进行处理。
+  3. p 类型策略，该类型策略就是赋具体资源访问权限的设置。mod 若不是 accessToken 则直接插入数据库 casbin_rbac 即可；否则除了在 casbin_rbace 中添加一条记录以外，还需要考虑用户已经配置了访问令牌的影响（需要区分访问令牌中的`*`是*用户能访问*的全部）。存在三种策略配置的情况：
+     - 用户-资源`(obj,act)`，而访问令牌为`<obj,act>`（根据 authcode 的授权对象列表），存在的情况如下
+       1. `(a1,a2)-<a1,*>`：用户有一个以任何方式访问服务 a1 的访问令牌，此时管理员添加一条允许该用户以 a2 方式访问服务 a1 的策略。该种情况需要在 casbin_authcode 中添加一条记录 `{sub:secret, obj:a1, mod:*, act:a2}`，并刷新 nacos 中服务 a1 的 authorized_keys.yml
+       2. `(a1,a2)-<*,a2>`：用户有一个以 a2 方式访问所有服务的访问令牌，此时管理员添加一条允许用户以 a2 方式访问服务 a1 的策略。该种情况需要在 casbin_authcode 中添加一条记录 `{sub:secret, obj:a1, mod:*, act:a2}`，并刷新 nacos 中服务 a1 的 authorized_keys.yml
+       3. `(a1,a2)-<a3,a4>`：用户有一个以 a4 方式访问服务 a3 的访问令牌，此时管理员添加一条允许用户以 a2 方式访问服务 a1 的策略。因为必然不存在`a3==a1&&a4==a2`的情况，所以此时不需要多余操作。
+       4. `(a1,a2)-<*,*>`：用户有一个以任何方式访问任何服务的访问令牌，此时管理员添加一条允许用户以 a2 方式访问服务 a1 的策略。该种情况需要再 casbin_authcode 中添加一条记录 `{sub:secret, obj:a1, mod:*, act:a2}`，并刷新 nacos 中服务 a1 的 authorized_keys.yml
+     - 用户组`USERGROUP:`-资源：与 用户-资源 的情况类似，区别在于需要观察该用户组下所有用户的情况
+     - 资源组`SRCGROUP:`-资源：与 用户-资源 的情况类似，需要考虑两种情况，有该能访问该资源组的用户的情况
+  4. g 类型策略，该类型策略就是设置归属关系从而获得权限（资源组、用户组）
+     - 用户-用户组，如果用户有访问令牌`<obj,act>`，存在的情况如下：
+       1. `<a1,*>`：用户有一个以任何方式访问服务 a1 的访问令牌，此时管理员将用户添加到某个用户组中。如果该用户组有以任何方式访问服务 a1 的策略，则需要在 casbin_authcode 中添加对应记录并刷新 nacos 的 authorized_keys.yml 文件。
+       2. `<*,a2>`：用户有一个以 a2 方式访问任意服务的访问令牌，此时管理员将用户添加到某个用户组中。如果该用户组有以 a2 方式访问的策略，则都需要在 casbin_authcode 中添加对应记录并刷新 nacos 的 authorized_keys.yml 文件。
+       3. `<*,*>`：用户有一个以任何方式访问任何服务的访问令牌，此时管理员将用户添加到某个用户组中。那么则需要在 casbin_authcode 添加上该用户组能够访问的策略并刷新 nacos 的 authorized_keys.yml 文件。
+     - 用户-资源组：情况同上述类似
+     - 用户组-资源组：情况同上述类似
+
+- 【管理员】删除访问策略：要求完全匹配
+
+  1. 参数合法性校验
+  2. 将 casbin_rbac 中将该记录删除，另外，如果删除的记录 mod 为 accessToken，还需要对应删除掉 casbin_authcode 中相关的记录。关联关系为 `用户组/资源组 --> 用户->访问令牌`。具体情况可以分为以下情况
+     - 用户-资源`(obj,act)`：获取该用户生成的有关于该资源`(obj,act)`的访问令牌，然后在 casbin_authcode 中删除
+     - 用户组-资源：同上，查询多个用户的情况
+     - 资源组-资源：类似情况
+     - 用户-用户组、用户-资源组、用户组-资源组：情况都类似
 
 ## 附录
 
