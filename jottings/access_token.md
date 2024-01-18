@@ -50,16 +50,16 @@
 
   1. 参数合法性校验：基本字段 appid, expires, remark, name; 授权对象列表（对象字段 obj, mod=accessToken, act）
   2. 策略`(obj,act)`合法性校验：
-     - `(a1,a2)`：去 casbin_rbac 中查询该用户 u 有无记录 `{sub:u, obj:a1, mod:accessToken, act:a2}`
-     - `(a1,*)`：去 casbin_rbac 中查询该用户 u 有无记录 `{sub:u, obj:a1, mod:accessToken, act:ANY}`
-     - `(*,a2)`：去 casbin_rbac 中查询该用户 u 有无记录 `{sub:u, obj:ANY, mod:accessToken, act:a2}`
-     - `(*,*)`：去 casbin_rbac 中查询该用户 u 有无记录 `{sub:u, obj:ANY, mod:accessToken, act:ANY}`
+     - `(a1,a2)`：去 casbin_rbac 中查询该用户 u 有无权限 `{sub:u, obj:a1, mod:accessToken, act:a2}`
+     - `(a1,*)`：去 casbin_rbac 中查询该用户 u 有无权限 `{sub:u, obj:a1, mod:accessToken, act:ANY}`，这种情况页面不会展示，所以后端需要校验是否存在至少一条。
+     - `(*,a2)`：去 casbin_rbac 中查询该用户 u 有无权限 `{sub:u, obj:ANY, mod:accessToken, act:a2}`，这种情况下暂时不存在也允许创建
+     - `(*,*)`：去 casbin_rbac 中查询该用户 u 有无权限 `{sub:u, obj:ANY, mod:accessToken, act:ANY}`，这种情况下暂时不存在也允许创建
   3. 在 authcode 中保存该访问令牌的相关信息 appid, expires, remark, name, 授权对象列表
   4. 在 casbin_authcode 添加该新生成的访问令牌 secret 可访问的资源（步骤 2 中所命中的策略）的策略 `secret -> {obj, mod, act}[]`。casbin_authcode 表中的 mod 字段暂时不启用（所有都是 `*`）
      - `(a1,a2)`：需要添加一条特定的记录 `{sub:secret, obj:a1, mod:*, act:a2}`
      - `(a1,*)`：需要添加一批特定的记录 `{sub:secret, obj:a1, mod:*, act:ANY}`
      - `(*,a2)`：需要添加一批特定的记录 `{sub:secret, obj:*, mod:*, act:a2}`
-     - `(*，*)`：需要添加一批特定的记录 `{sub:secret, obj:*, mod:*, act:*}`
+     - `(*,*)`：需要添加一批特定的记录 `{sub:secret, obj:*, mod:*, act:*}`
   5. 更新 nacos 上对应服务的 authorized_keys.yml：根据 obj 进行全量刷新：在 casbin_authcode 表通过 obj 过滤出目标 secret 及访问方式写入 nacos
   6. 事务处理：当任何一步发生错误时都需要进行回滚，当进行 sql 操作时，形成对应的相反操作。保存成 Map，key 为表，value 是具体的 sql 操作参数
 
@@ -80,6 +80,8 @@
        2. `(a1,a2)-<*,a2>`：用户有一个以 a2 方式访问所有服务的访问令牌，此时管理员添加一条允许用户以 a2 方式访问服务 a1 的策略。该种情况需要在 casbin_authcode 中添加一条记录 `{sub:secret, obj:a1, mod:*, act:a2}`，并刷新 nacos 中服务 a1 的 authorized_keys.yml
        3. `(a1,a2)-<a3,a4>`：用户有一个以 a4 方式访问服务 a3 的访问令牌，此时管理员添加一条允许用户以 a2 方式访问服务 a1 的策略。因为必然不存在`a3==a1&&a4==a2`的情况，所以此时不需要多余操作。
        4. `(a1,a2)-<*,*>`：用户有一个以任何方式访问任何服务的访问令牌，此时管理员添加一条允许用户以 a2 方式访问服务 a1 的策略。该种情况需要再 casbin_authcode 中添加一条记录 `{sub:secret, obj:a1, mod:*, act:a2}`，并刷新 nacos 中服务 a1 的 authorized_keys.yml
+       5. `(a1,*)`：注意`()`中的`*`是管理员角度的所有。
+       6. `(*,a2)`：
      - 用户组`USERGROUP:`-资源：与 用户-资源 的情况类似，区别在于需要观察该用户组下所有用户的情况
      - 资源组`SRCGROUP:`-资源：与 用户-资源 的情况类似，需要考虑两种情况，有该能访问该资源组的用户的情况
   4. g 类型策略，该类型策略就是设置归属关系从而获得权限（资源组、用户组）
@@ -98,6 +100,12 @@
      - 用户组-资源：同上，查询多个用户的情况
      - 资源组-资源：类似情况
      - 用户-用户组、用户-资源组、用户组-资源组：情况都类似
+
+casbin_rbac 和 casbin_authcode 中的 `*` 是相同含义，即管理员视角中的所有
+
+特殊场景模拟
+
+- 管理员配置了一条策略 `{sub:"SRCGROUP:admin", obj:"*", mod:"*", act:"*"}`，接着将用户 u 添加到该资源组中
 
 ## 附录
 
