@@ -101,11 +101,38 @@
      - 资源组-资源：类似情况
      - 用户-用户组、用户-资源组、用户组-资源组：情况都类似
 
-casbin_rbac 和 casbin_authcode 中的 `*` 是相同含义，即管理员视角中的所有
+casbin_rbac 和 casbin_authcode 中的 `*` 是相同含义，即管理员视角中的所有。简单理解 casbin_rbac 和 casbin_authcode 没有直接的关联关系，用户对资源的访问权限只看 casbin_rbac；而访问令牌的访问权限只看 casbin_authcode。
 
-特殊场景模拟
+**特殊场景说明**
 
-- 管理员配置了一条策略 `{sub:"SRCGROUP:admin", obj:"*", mod:"*", act:"*"}`，接着将用户 u 添加到该资源组中
+场景 1：删除策略
+
+casbin_rbac 中有如下配置，那么用户 0001 在访问令牌中的可访问服务中可以看到 bards:0.0.1:192.168.15.42:dev 下有 bards:0.0.1:192.168.15.42:dev-r 和 bards:0.0.1:192.168.15.42:dev-w 两项目。此时用户 0001 可以生成单独的某个权限的访问令牌，比如 `(bards:0.0.1:192.168.15.42:dev,accessToken,r)` 或者 `(bards:0.0.1:192.168.15.42:dev,accessToken,w)`。也可以生成以任何方式访问资源 bards:0.0.1:192.168.15.42:dev 的访问令牌 `(bards:0.0.1:192.168.15.42:dev,accessToken,*)`，在 casbin_authcode 中的内容如下。
+
+```
+# casbin_rbac 记录
+== begin ==
+p, USER:0001, bards:0.0.1:192.168.15.42:dev, accessToken, r
+g, USER:0001, USERGROUP:it
+p, USERGROUP:it, bards:0.0.1:192.168.15.42:dev, accessToken, w
+== end ==
+
+# casbin_authcode 记录
+== begin ==
+# 生成 (bards:0.0.1:192.168.15.42:dev,accessToken,r) 的访问令牌
+p, appsecret, bards:0.0.1:192.168.15.42:dev, accessToken, r
+
+# 生成 (bards:0.0.1:192.168.15.42:dev,accessToken,w) 的访问令牌
+p, appsecret, bards:0.0.1:192.168.15.42:dev, accessToken, w
+
+# 生成 (bards:0.0.1:192.168.15.42:dev,accessToken,*) 的访问令牌
+p, appsecret, bards:0.0.1:192.168.15.42:dev, accessToken, *
+== end ==
+```
+
+此时，如果删除了 `g,USER:0001,USERGROUP:it` 的记录，此时用户 0001 不再有资源 bards:0.0.1:192.168.15.42:dev 的 w 权限。若用户 0001 有一条可以以任何方式访问 bards:0.0.1:192.168.15.42:dev 的访问令牌 `(bards:0.0.1:192.168.15.42:dev,accessToken,*)`。在 casbin_authcode 中存在的记录`p, appsecret, bards:0.0.1:192.168.15.42:dev, accessToken, *`不应该直接删除，而是变为 `p, appsecret, bards:0.0.1:192.168.15.42:dev, accessToken, r`。
+
+目前的实现方式设置为删除策略时，取所有受影响的用户的所有 authcodes，用用户级能访问的资源和 authcodes 设定的访问资源作交集进行全量更新（原先的在 casbin_authcode 表中进行删除）。
 
 ## 附录
 
