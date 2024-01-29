@@ -44,7 +44,7 @@
 
 由于管理员 admin 配置`mod: accessToken`的策略时会影响到用户 user 配置了含有`*`的资源访问的访问令牌的访问资源范围。不过这不影响访问令牌那张表。访问令牌真正能够访问哪些服务，是由 casbin 服务进行维护，其记录格式为`{p, appsecret, obj, mod, act}`（p 表示策略类型，appsecret 是令牌），所以当管理员删除某个用户访问某个资源的权限时，只需要将该 casbin 服务的表更新即可（`delete where appsecret=<userid's secret> and obj=? and act=?`）；当用户删除访问令牌，只需要再多做一步删除访问令牌表中对应记录。
 
-总结起来，主要涉及的接口及流程如下。涉及三张表 1. authcode 存放访问令牌的配置信息 2. casbin_authcode 存放访问令牌的权限访问信息 3. casbin_rbac 存放用户的权限访问信息。下面描述中 `ANY` 表示任意取值。用户配置的访问令牌能访问哪些服务是 authcode 中进行保存，但是该访问服务只能视为“历史”的。casbin_authcode 中只有访问令牌的访问信息，访问令牌能够访问哪些资源仅仅看这张表中是否相关的记录，这个表中只有 p 类型的策略; 另外，casbin_authcode 表中不允许出现 `obj=*` 或 `mod=*` 的记录（casbin_authcode中的`*`与casbin_rbac的`*`含义一致，都是管理员视角下的所有）。casbin_rbac 保存用户能够访问哪些资源的权限，其中存在四个实体，并且存在`*`的通配符，表示gsfsrv表中的所有资源。虽然访问令牌是用户下的，但在技术实现上，casbin_rbac 和 casbin_authcode 是彼此独立的，用户的资源访问和访问令牌的资源访问是两套casbin鉴权系统，管理员对用户的资源访问对访问令牌的资源访问的影响关系由后端进行维护。
+总结起来，主要涉及的接口及流程如下。涉及三张表 1. authcode 存放访问令牌的配置信息 2. casbin_authcode 存放访问令牌的权限访问信息 3. casbin_rbac 存放用户的权限访问信息。下面描述中 `ANY` 表示任意取值。用户配置的访问令牌能访问哪些服务是 authcode 中进行保存，但是该访问服务只能视为“历史”的。casbin_authcode 中只有访问令牌的访问信息，访问令牌能够访问哪些资源仅仅看这张表中是否相关的记录，这个表中只有 p 类型的策略; 另外，casbin_authcode 表中不允许出现 `obj=*` 或 `mod=*` 的记录（casbin_authcode 中的`*`与 casbin_rbac 的`*`含义一致，都是管理员视角下的所有）。casbin_rbac 保存用户能够访问哪些资源的权限，其中存在四个实体，并且存在`*`的通配符，表示 gsfsrv 表中的所有资源。虽然访问令牌是用户下的，但在技术实现上，casbin_rbac 和 casbin_authcode 是彼此独立的，用户的资源访问和访问令牌的资源访问是两套 casbin 鉴权系统，管理员对用户的资源访问对访问令牌的资源访问的影响关系由后端进行维护。
 
 - 【用户】创建访问令牌
 
@@ -72,7 +72,9 @@
 
 - 【管理员】创建访问策略
 
-  1. 参数合法性校验：tpe（只能是 p 和 g）, sub, obj, mod, act。不允许为空。
+  1. 合法性校验：
+     - 参数合法性：tpe（p/g）, sub（`USER:`/`USERGROUP:`/`SRCGROUP:`）, obj（`*`/gsfsrv.id/`USERGROUP:`/`SRCGROUP:`）, mod（conf/accessToken）, act（`*`/r/w）。
+     - 存在性：(tpe, sub, obj, mod, act)
   2. 如果存在包含和被包含的情况需要进行处理。
   3. p 类型策略，该类型策略就是赋具体资源访问权限的设置。mod 若不是 accessToken 则直接插入数据库 casbin_rbac 即可；否则除了在 casbin_rbace 中添加一条记录以外，还需要考虑用户已经配置了访问令牌的影响（需要区分访问令牌中的`*`是*用户能访问*的全部）。存在三种策略配置的情况：
      - 用户-资源`(obj,act)`，而访问令牌为`<obj,act>`（根据 authcode 的授权对象列表），存在的情况如下
