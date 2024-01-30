@@ -244,7 +244,17 @@ _扩展插槽_
 1个 PCIe x1 插槽
 - PCI_E2 插槽（来自 B760 芯片组）
   - 支持 PCIe 3.0 x1
+
+解读：
+主板上有两个物理尺寸为 PCIe x16 的插槽，但是它们的实际带宽是不同的，一个是 PCIe 5.0 x16，另一个是 PCIe 4.0 x4
+主板上有一个物理尺寸为 PCIe x1 的插槽，实际的带宽是 PCIe 3.0 x1
 ```
+
+说明：
+
+- PCIe 即为 PCI Express（外围组件快速互连），是一种高速串行扩展总线标准，通常用于连接显卡、固态硬盘以及采集卡和无线网卡等外设。
+- PCIe 插槽中 x16、x4、x1 表示是物理尺寸，也表示通道数，通道数越多意味着带宽越高、插槽也更长；而 PCIe 5.0 x16、PCIe 4.0 x4、PCIe 3.0 x1 则是表示 PCIe 不同的规格（5.0/4.0/3.0）下实际占用的带宽（16/4/1 个通道）
+- 每一代 PCIe 的速度都是上代的两倍。PCIe 3.0 的数据传输速率为每秒 8 GB，而 PCIe 4.0 为 16 GT/秒，PCIe 5.0 为 32 GT/秒。（比特率的度量单位为千兆传输速率，表示的是编码前的理论最大速度——现实中的速度可能会更慢。）（来源：[什么是 PCIe 4.0 和 5.0？| intel](https://www.intel.cn/content/www/cn/zh/gaming/resources/what-is-pcie-4-and-why-does-it-matter.html)）
 
 _SATA 端口_
 
