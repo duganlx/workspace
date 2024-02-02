@@ -342,11 +342,17 @@ CPU 能在主板上满载拷机 30min 不降频率，就可以认为是带得动
 
 ##### Q: ddr4 中，CJR 和 DJR 是什么意思?
 
+CJR（C-Die Junior）： C-Die 是一种由 Micron 制造的 DDR4 内存芯片。CJR 通常是 Micron C-Die 芯片的一种子型号或新一代，通常被认为是性能较好的内存芯片。CJR 芯片被用于制造各种品牌的 DDR4 内存模块。
+
+D-Die 是由 Samsung 制造的 DDR4 内存芯片。DJR 则是 Samsung D-Die 芯片的一个子型号或新一代。类似于 C-Die，DJR 芯片通常被认为具有良好的性能，并用于制造高性能 DDR4 内存模块。
+
 ##### Q: ddr4 和 ddr5 对比
 
 海力士 cjr vs djr: cjr 时序更低，读写更强；djr 更耐高压容易上超频
 
 2023/11/29 bilibili@船长总动员：海力士 A-Die、新(带 GD)海力士 M-Die
+
+ddr4 综合排名：海力士 DJR > 长鑫 CJ-A > 海力士 CJR > 三星 Bdie
 
 明确需求: ddr5 16G\*2 正常玩不超频
 
