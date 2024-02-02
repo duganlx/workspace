@@ -20,7 +20,7 @@ fi
 read -p "Please enter the port mapping configuration for container $container_name (separated by spaces): " ports_map
 port_map_array=($ports_map)
 
-docker_run_cmd="docker run -itd --name $container_name --privileged=true"
+docker_run_cmd="docker run -itd --name $container_name --privileged=true -e TZ=\"Asia/Shanghai\""
 for port_map in ${port_map_array[@]}; do
   docker_run_cmd="$docker_run_cmd -p $port_map"
 done
