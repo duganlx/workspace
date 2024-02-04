@@ -38,3 +38,8 @@
 - cpu 情况 `mpstat`
 - 内存情况 `free -h`; 实时 `watch -n 1 free -m`
 - 硬盘情况 `df -h`; 文件夹大小 `du -h /path`;
+
+## git
+
+- 查看仓库状态 `git status`
+- 压缩提交: a. `git rebase -i xxx`; b. 将要压缩的提交的 pick 改为 s; c. 写提交注释
