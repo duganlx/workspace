@@ -2,6 +2,8 @@
 
 ## 权限管理三期
 
+> 2024-02-07
+
 权限设计二期主要完成了针对金葵花服务的权限配置，其业务流程如下
 
 1. 管理员先新建金葵花服务，接着配置哪些用户可以访问该金葵花服务（选择服务模块为 accessToken）。
@@ -15,13 +17,31 @@
 - casbin_rbac{p, sub, obj, mod, act} | {g, sub, group} 用户资源访问控制信息，其中有用户组、资源组的概念，方便对用户进行资源的批量授权。
 - casbin_authcode{p, sub, obj, act} 令牌资源访问控制信息
 
+二期设计有几点原则假设
+
+1. 生成的令牌的可访问服务不允许自动扩大授权范围（可访问服务选择“\*(用户所有)”场景，即代表此刻的用户所有）
+
 在权限管理三期中，希望能够对金葵花监控页面中的服务也能控制是否能够访问，以及在结算明细报表中，按产品/按投资经理/按策略中能够控制用户能够展示的单元。这些属于 QuantWeb 页面上的展示数据权限。页面访问性只需要分为可访问和不可访问两种，不存在更细粒度的访问方式（如读/写等）。另外，页面的路由最多分为三级，页面内存在 tab 页（比如结算明细报表中的“按产品/按投资经理/按策略”；金葵花监控页的“生产/访问/测试”），tab 页下可能有多个单元 unit 的选择（比如结算明细报表中按产品 tab 中的“产品/资金账号/资产单元”；金葵花监控页的生产 tab 中有金葵花服务）。每个 unit 都有一堆 tab 页（称之为 模块 mod）可以查阅（比如金葵花监控中的“目标/持仓/委托/成交/划拨/配置”；结算明细表中的“资产概要/持仓明细/资产对账/持仓对账等”）。采取该种设计需要添加多一张表 casbin_quantweb，其结构为 casbin_quantweb {p, sub, url, tab, unit, mod, act} | {g, sub, group}。
 
-再进一步抽象，其实 casbin_quantweb 中 sub+url+tab+unit 可以看成是 casbin_rbac 中的 obj 字段，如此以来就可以将这两表进行整合。原本的 casbin_rbac 的 obj 字段内容格式为 `serv`
+再进一步抽象，其实 casbin_quantweb 中 url+tab+unit 可以看成是 casbin_rbac 中的 obj 字段，如此以来就可以将这两表进行整合。原本的 casbin_rbac 的 obj 字段内容格式直接就是金葵花服务名（类似：KlindDs:v1.0.3:192.168.15.42:prod），那么现在 obj 字段需要采用两套命名（其中`<>`表示变量）：`GSF:<服务名>:<版本号>:<ip>:<环境>` 和 `QWEB:<url>:<tab>:<unit>`。举例如下：
+
+```
+# 金葵花服务 GSF:<服务名>:<版本号>:<ip>:<环境>
+GSF:KlindDs:v1.0.3:192.168.15.42:prod
+
+# quantweb页面权限 QWEB:<url>:<tab>:<unit>
+结算明细报表按产品中产品 QWEB:/operation/settlement/detail:product:DRWGJH
+结算明细报表按产品中资金账号 QWEB:/operation/settlement/detail:product:0650020666
+结算明细报表按产品中资产单元 QWEB:/operation/settlement/detail:product:DRWGJHZS_01
+结算明细报表
+
+```
 
 ## 附录
 
-### 1. 定位问题 nacos-sdk-go 调用注册到 nacos 的服务器 http 接口时报 `code = 503 reason = NODE_NOT_FOUND message = error: code = 503 reason = no_available_node message =  metadata = map[] cause = <nil> metadata = map[] cause = <nil>`
+### nacos-sdk-go 使用问题&解决
+
+##### 1. 定位问题 nacos-sdk-go 调用注册到 nacos 的服务器 http 接口时报 `code = 503 reason = NODE_NOT_FOUND message = error: code = 503 reason = no_available_node message =  metadata = map[] cause = <nil> metadata = map[] cause = <nil>`
 
 客户端通过 nacos 去调用服务器的 http 方式接口时，会出现问题 `code = 503 reason = NODE_NOT_FOUND message = error: code = 503 reason = no_available_node message =  metadata = map[] cause = <nil> metadata = map[] cause = <nil>`，问题定位如下。解决办法有两种，第一种是采用 grpc 去访问（推荐）；第二种是手动取服务节点转换成最终的 url(比如 `http://127.0.0.1:8000`)去访问。
 
@@ -129,11 +149,11 @@ func (client *Client) do(req *http.Request) (*http.Response, error) {
 }
 ```
 
-### 2. `rpc error: code = DeadlineExceeded desc = context deadline exceeded` 问题解决
+##### 2. `rpc error: code = DeadlineExceeded desc = context deadline exceeded` 问题解决
 
 客户端每次运行前都需要将 cache/naming 中的内容删除，否则无法启动显示: rpc error: code = DeadlineExceeded desc = context deadline exceeded
 
-### 3. nacos 调研进度
+##### 3. nacos 调研进度
 
 注册中心
 
@@ -146,11 +166,15 @@ func (client *Client) do(req *http.Request) (*http.Response, error) {
 - [x] 服务启动时读取 nacos 配置
 - [ ] 服务运行中实时同步最新的 nacos 配置
 
-### 4. 访问令牌一期
+### 访问令牌一期
+
+> 时间: 2023-11-18
 
 访问令牌一期的目标是提供新的登录方式，用该方式代替用户名密码登录方式，降低密码泄露的风险。具体使用上，只需要提供 appid 和 appsecret 即可登录，产生对应的用户 token 信息。appsecret 为随机生成的长度为 50 的字符串，该字符串保证全局唯一。
 
-### 5. 权限设计一期调研
+### 权限设计一期调研
+
+> 时间: 2023-11-23
 
 目前存在两个需求点：1. 资产单元的权限管理; 2. 微服务架构下服务的权限管理;
 
@@ -264,7 +288,9 @@ _微服务架构下服务的权限管理_
 
 用 nacos 作为服务注册&发现中心，各个`资产单元`和`用户中心`都会在 nacos 进行注册。当用户的某个模型需要在资产单元`Au1`中下单时，带上 appid 和 appsecret，`Au1`会去访问`用户中心`的接口进行鉴权，当鉴权通过之后，则将该对 appid 和 appsecret 保存在内存中，下次如果再遇到该对时就不用再去用户中心鉴权而直接放行。这样的设计会导致
 
-### 6. 权限设计一期
+### 权限设计一期
+
+> 时间: 2024-01-12
 
 在*权限设计一期调研*中，已经完成 casbin 进行鉴权的过程，并且设计了 GSF 进行鉴权的方式方法。但是该套方案在讨论之后发现存在延迟高和引用服务过多的问题，~~所以目前设计的方案为：用户中心管理并维护用户可访问资产单元列表的数据，并生成每个资产单元各自的*用户访问权限信息表*推送到 nacos；GSF 只需要读取并监听 nacos 中对应的资产单元的*用户访问权限信息表*即可。当有用户需要在 gsf 中下单时，首先 gsf 会从请求的 token 中获取到用户的信息，接着去*用户访问权限信息表*查看该用户是否有权限，即可完全鉴权。~~需要调研如下内容。
 
@@ -500,7 +526,9 @@ secrets:
 
 其中 `secrets` 是能够访问该服务的 secret 列表。能够导致列表变化的情况有两种，一是管理员调整*用户-用户组-资源组-资源*之间的关联关系，二是用户增删访问令牌时。往 nacos 推送 secret 列表数据发生在 uc 项目刚启动时 和 列表数据发送变化时 两种情况。
 
-### 7. 权限设计二期
+### 权限设计二期
+
+> 时间: 2024-02-07
 
 在*权限设计一期*中，利用 casbin 已经完成用户对服务的访问控制，以及用户令牌对服务的访问控制。因为该权限仅仅到服务这一层级，而服务下存在多个模块（如配置文件模块），需要对这些模块进行更细粒度的访问。并且，目前对于某个服务只能设置是否访问，也需要进一步细化是什么访问类型（如可读`r`、可写`w`、读写`*`等）。
 
