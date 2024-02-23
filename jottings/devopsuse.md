@@ -87,3 +87,13 @@ wins: `wsl2`; `Windows Terminal`
 文档
 
 - [matter.js](https://brm.io/matter-js/docs/)
+
+### 服务
+
+- redis:
+
+```bash
+sudo docker run -p 6379:6379 --restart=always --name redis_queue -itd redis redis-server --requirepass pwd
+sudo docker exec -it jhluc_redis redis-cli
+redis-cli -h host -p port -a pwd
+```

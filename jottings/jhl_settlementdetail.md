@@ -344,3 +344,21 @@ type SettleUnitItem = {
   category: "unit" | "account" | "product";
 };
 ```
+
+### SQL
+
+```sql
+-- ## 表 dim_unit_account_product ##
+-- 查询 实盘单元
+SELECT * FROM dim_datahub.dim_unit_account_product WHERE account_is_real = '0';
+-- 查询 仿真单元
+SELECT * FROM dim_datahub.dim_unit_account_product WHERE account_is_real = '1';
+
+-- 查询 产品页中 “存续” 的产品
+SELECT DISTINCT product_inner_code FROM dim_datahub.dim_unit_account_product WHERE unit_status = '1' AND account_is_real = '0';
+SELECT count(*) AS total FROM (SELECT DISTINCT product_inner_code FROM dim_datahub.dim_unit_account_product WHERE unit_status = '1' AND account_is_real = '0');
+-- 查询 产品页中 “存续” 的资金账号
+SELECT DISTINCT account_code, account_name, product_inner_code, product_short_name FROM dim_datahub.dim_unit_account_product WHERE unit_status = '1' AND account_is_real = '0'
+-- 查询 产品页中 “存续” 的资产单元
+SELECT DISTINCT unit_code, unit_name, account_code, account_name, product_inner_code, product_short_name FROM dim_datahub.dim_unit_account_product WHERE unit_status = '1' AND account_is_real = '0'
+```
