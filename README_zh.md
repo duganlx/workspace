@@ -35,13 +35,3 @@ _说明_
 - 下载常用的开发工具
 - 安全性考虑，将开发的文件全部采用挂载式
 
-## Appendix
-
-vscode 开发配置
-
-```
-Tab Size: 2
-Word Wrap: on
-```
-
-前端插件: `Prettier - Code formatter`
