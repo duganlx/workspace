@@ -10,7 +10,7 @@ DOWNLOAD_DIR=$WORKSPACE_DIR/download
 SOURCE_DIR=$WORKSPACE_DIR/src
 
 IMAGE_NAME=basic
-IMAGE_TAG=v1.0.0
+IMAGE_TAG=v1.1.0
 
 cat <<EOF
 Operational Guidelines

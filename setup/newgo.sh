@@ -20,7 +20,7 @@ fi
 read -p "Please enter the port mapping configuration for container $container_name (separated by spaces): " ports_map
 port_map_array=($ports_map)
 
-docker_run_cmd="docker run -itd --name $container_name --privileged=true"
+docker_run_cmd="docker run -itd --name $container_name --privileged=true -e TZ=\"Asia/Shanghai\""
 for port_map in ${port_map_array[@]}; do
   docker_run_cmd="$docker_run_cmd -p $port_map"
 done
@@ -118,13 +118,19 @@ go install github.com/go-kratos/kratos/cmd/protoc-gen-go-errors/v2@latest
 go install github.com/google/gnostic/cmd/protoc-gen-openapi@latest
 go install github.com/google/wire/cmd/wire@latest
 go install github.com/envoyproxy/protoc-gen-validate@latest
+
+# Configuration: gitlab.jhlfund.com
+go env -w GOPRIVATE=gitlab.jhlfund.com
+go env -w GONOPROXY=gitlab.jhlfund.com
+# go env -w GONOSUBDB=gitlab.jhlfund.com
+go env -w GOINSECURE=gitlab.jhlfund.com
 EOT
 
 
 # Configuration Inside the Container
 docker exec -it $container_name /bin/bash -c "chmod 750 /download/$inrunsh"
 docker exec -it $container_name /bin/bash -c "bash /download/$inrunsh"
-docker exec -it $container_name /bin/bash -c 'apt-get update && apt-get install -y gcc automake autoconf libtool make'
+docker exec -it $container_name /bin/bash -c 'apt-get update && apt-get install -y gcc automake autoconf libtool make pkg-config libzmq5 libczmq-dev g++'
 
 
 echo -e "Container '$container_name' created successfully. Enter the container with the following command: docker exec -it $container_name /bin/bash"
